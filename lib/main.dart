@@ -2,14 +2,20 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const RnBrowserApp());
+  final savedSettings = await RnBrowserSettings.load();
+  final savedProfile = await RnProfileStore.load();
+  runApp(RnBrowserApp(initialSettings: savedSettings, initialProfile: savedProfile));
 }
 
 class RnBrowserApp extends StatelessWidget {
-  const RnBrowserApp({super.key});
+  const RnBrowserApp({super.key, required this.initialSettings, required this.initialProfile});
+
+  final RnBrowserSettings initialSettings;
+  final String initialProfile;
 
   @override
   Widget build(BuildContext context) {
@@ -22,7 +28,7 @@ class RnBrowserApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: RnColors.lemon, brightness: Brightness.dark),
         useMaterial3: true,
       ),
-      home: const RnShell(),
+      home: RnShell(initialSettings: initialSettings, initialProfile: initialProfile),
     );
   }
 }
@@ -34,6 +40,24 @@ class RnColors {
   static const cyan = Color(0xFF50F6D7);
   static const pink = Color(0xFFFF4FD2);
   static const border = Color(0x553CFF68);
+}
+
+class RnProfileStore {
+  const RnProfileStore._();
+
+  static const key = 'rn.activeProfile';
+
+  static Future<String> load() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString(key);
+    if (saved == 'Guest Space') return 'Guest Space';
+    return 'My Space';
+  }
+
+  static Future<void> save(String profile) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(key, profile == 'Guest Space' ? 'Guest Space' : 'My Space');
+  }
 }
 
 class RnBrowserSettings {
@@ -58,6 +82,36 @@ class RnBrowserSettings {
   final bool desktopSite;
   final bool darkWebPages;
   final double zoom;
+
+  static const _prefix = 'rn.settings.';
+
+  static Future<RnBrowserSettings> load() async {
+    final prefs = await SharedPreferences.getInstance();
+    return RnBrowserSettings(
+      mic: prefs.getBool('${_prefix}mic') ?? false,
+      camera: prefs.getBool('${_prefix}camera') ?? false,
+      files: prefs.getBool('${_prefix}files') ?? true,
+      regionMode: prefs.getBool('${_prefix}regionMode') ?? false,
+      pinchAllowList: prefs.getBool('${_prefix}pinchAllowList') ?? true,
+      clearOnExit: prefs.getBool('${_prefix}clearOnExit') ?? true,
+      desktopSite: prefs.getBool('${_prefix}desktopSite') ?? false,
+      darkWebPages: prefs.getBool('${_prefix}darkWebPages') ?? false,
+      zoom: prefs.getDouble('${_prefix}zoom') ?? 100,
+    );
+  }
+
+  Future<void> save() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('${_prefix}mic', mic);
+    await prefs.setBool('${_prefix}camera', camera);
+    await prefs.setBool('${_prefix}files', files);
+    await prefs.setBool('${_prefix}regionMode', regionMode);
+    await prefs.setBool('${_prefix}pinchAllowList', pinchAllowList);
+    await prefs.setBool('${_prefix}clearOnExit', clearOnExit);
+    await prefs.setBool('${_prefix}desktopSite', desktopSite);
+    await prefs.setBool('${_prefix}darkWebPages', darkWebPages);
+    await prefs.setDouble('${_prefix}zoom', zoom);
+  }
 
   RnBrowserSettings copyWith({
     bool? mic,
@@ -85,7 +139,10 @@ class RnBrowserSettings {
 }
 
 class RnShell extends StatefulWidget {
-  const RnShell({super.key});
+  const RnShell({super.key, required this.initialSettings, required this.initialProfile});
+
+  final RnBrowserSettings initialSettings;
+  final String initialProfile;
 
   @override
   State<RnShell> createState() => _RnShellState();
@@ -93,16 +150,29 @@ class RnShell extends StatefulWidget {
 
 class _RnShellState extends State<RnShell> {
   int index = 0;
-  String profile = 'My Space';
-  RnBrowserSettings settings = const RnBrowserSettings();
+  late String profile;
+  late RnBrowserSettings settings;
+
+  @override
+  void initState() {
+    super.initState();
+    profile = widget.initialProfile;
+    settings = widget.initialSettings;
+  }
 
   Future<void> changeProfile(String next) async {
     if (next == profile) return;
     setState(() => profile = next);
+    await RnProfileStore.save(next);
     if (settings.clearOnExit) {
       await CookieManager.instance().deleteAllCookies();
       await WebStorageManager.instance().deleteAllData();
     }
+  }
+
+  Future<void> updateSettings(RnBrowserSettings next) async {
+    setState(() => settings = next);
+    await next.save();
   }
 
   @override
@@ -110,12 +180,7 @@ class _RnShellState extends State<RnShell> {
     final pages = [
       StartScreen(onStart: () => setState(() => index = 1)),
       BrowserScreen(profile: profile, settings: settings, onProfileChanged: changeProfile),
-      SettingsScreen(
-        profile: profile,
-        settings: settings,
-        onProfileChanged: changeProfile,
-        onSettingsChanged: (next) => setState(() => settings = next),
-      ),
+      SettingsScreen(profile: profile, settings: settings, onProfileChanged: changeProfile, onSettingsChanged: updateSettings),
     ];
 
     return Scaffold(
