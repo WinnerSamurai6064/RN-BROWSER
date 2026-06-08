@@ -1,8 +1,10 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const RnBrowserApp());
 }
 
@@ -28,11 +30,58 @@ class RnBrowserApp extends StatelessWidget {
 class RnColors {
   static const black = Color(0xFF050705);
   static const panel = Color(0xCC10160F);
-  static const panelStrong = Color(0xEE111A10);
   static const lemon = Color(0xFFC7FF3A);
   static const cyan = Color(0xFF50F6D7);
   static const pink = Color(0xFFFF4FD2);
   static const border = Color(0x553CFF68);
+}
+
+class RnBrowserSettings {
+  const RnBrowserSettings({
+    this.mic = false,
+    this.camera = false,
+    this.files = true,
+    this.regionMode = false,
+    this.pinchAllowList = true,
+    this.clearOnExit = true,
+    this.desktopSite = false,
+    this.darkWebPages = false,
+    this.zoom = 100,
+  });
+
+  final bool mic;
+  final bool camera;
+  final bool files;
+  final bool regionMode;
+  final bool pinchAllowList;
+  final bool clearOnExit;
+  final bool desktopSite;
+  final bool darkWebPages;
+  final double zoom;
+
+  RnBrowserSettings copyWith({
+    bool? mic,
+    bool? camera,
+    bool? files,
+    bool? regionMode,
+    bool? pinchAllowList,
+    bool? clearOnExit,
+    bool? desktopSite,
+    bool? darkWebPages,
+    double? zoom,
+  }) {
+    return RnBrowserSettings(
+      mic: mic ?? this.mic,
+      camera: camera ?? this.camera,
+      files: files ?? this.files,
+      regionMode: regionMode ?? this.regionMode,
+      pinchAllowList: pinchAllowList ?? this.pinchAllowList,
+      clearOnExit: clearOnExit ?? this.clearOnExit,
+      desktopSite: desktopSite ?? this.desktopSite,
+      darkWebPages: darkWebPages ?? this.darkWebPages,
+      zoom: zoom ?? this.zoom,
+    );
+  }
 }
 
 class RnShell extends StatefulWidget {
@@ -45,13 +94,28 @@ class RnShell extends StatefulWidget {
 class _RnShellState extends State<RnShell> {
   int index = 0;
   String profile = 'My Space';
+  RnBrowserSettings settings = const RnBrowserSettings();
+
+  Future<void> changeProfile(String next) async {
+    if (next == profile) return;
+    setState(() => profile = next);
+    if (settings.clearOnExit) {
+      await CookieManager.instance().deleteAllCookies();
+      await WebStorageManager.instance().deleteAllData();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final pages = [
       StartScreen(onStart: () => setState(() => index = 1)),
-      BrowserScreen(profile: profile, onProfileChanged: (v) => setState(() => profile = v)),
-      SettingsScreen(profile: profile, onProfileChanged: (v) => setState(() => profile = v)),
+      BrowserScreen(profile: profile, settings: settings, onProfileChanged: changeProfile),
+      SettingsScreen(
+        profile: profile,
+        settings: settings,
+        onProfileChanged: changeProfile,
+        onSettingsChanged: (next) => setState(() => settings = next),
+      ),
     ];
 
     return Scaffold(
@@ -64,7 +128,6 @@ class _RnShellState extends State<RnShell> {
 
 class GlassPanel extends StatelessWidget {
   const GlassPanel({super.key, required this.child, this.padding = const EdgeInsets.all(16), this.radius = 26});
-
   final Widget child;
   final EdgeInsets padding;
   final double radius;
@@ -98,43 +161,31 @@ class StartScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: RnColors.black,
-      body: Stack(
-        children: [
-          const StartBackdrop(),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(18, 14, 18, 112),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const BrandRow(),
-                  const SizedBox(height: 18),
-                  const Expanded(child: HeroCard()),
-                  const SizedBox(height: 18),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 62,
-                    child: FilledButton(
-                      style: FilledButton.styleFrom(backgroundColor: RnColors.lemon, foregroundColor: Colors.black, shape: const StadiumBorder()),
-                      onPressed: onStart,
-                      child: const Text('Start Secure Browsing', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Center(
-                    child: TextButton.icon(
-                      onPressed: () {},
-                      icon: const Icon(Icons.sync_lock_rounded, size: 18),
-                      label: const Text('Login / Sync'),
-                      style: TextButton.styleFrom(foregroundColor: RnColors.lemon),
-                    ),
-                  )
-                ],
+      body: Stack(children: [
+        const StartBackdrop(),
+        SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 14, 18, 112),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const BrandRow(),
+              const SizedBox(height: 18),
+              const Expanded(child: HeroCard()),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                height: 62,
+                child: FilledButton(
+                  style: FilledButton.styleFrom(backgroundColor: RnColors.lemon, foregroundColor: Colors.black, shape: const StadiumBorder()),
+                  onPressed: onStart,
+                  child: const Text('Start Secure Browsing', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
+                ),
               ),
-            ),
+              const SizedBox(height: 10),
+              Center(child: TextButton.icon(onPressed: () {}, icon: const Icon(Icons.sync_lock_rounded, size: 18), label: const Text('Login / Sync'), style: TextButton.styleFrom(foregroundColor: RnColors.lemon))),
+            ]),
           ),
-        ],
-      ),
+        ),
+      ]),
     );
   }
 }
@@ -144,13 +195,11 @@ class StartBackdrop extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Positioned.fill(child: Container(decoration: const BoxDecoration(gradient: RadialGradient(center: Alignment.topRight, radius: 1.1, colors: [Color(0x443CFF68), Color(0x00000000)])))),
-        Positioned(top: 95, right: -60, child: GlowBlob(size: 240, color: RnColors.lemon)),
-        Positioned(bottom: 130, left: -80, child: GlowBlob(size: 220, color: RnColors.cyan)),
-      ],
-    );
+    return Stack(children: [
+      Positioned.fill(child: Container(decoration: const BoxDecoration(gradient: RadialGradient(center: Alignment.topRight, radius: 1.1, colors: [Color(0x443CFF68), Color(0x00000000)])))),
+      Positioned(top: 95, right: -60, child: GlowBlob(size: 240, color: RnColors.lemon)),
+      Positioned(bottom: 130, left: -80, child: GlowBlob(size: 220, color: RnColors.cyan)),
+    ]);
   }
 }
 
@@ -170,18 +219,16 @@ class BrandRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        const GlassPanel(radius: 18, padding: EdgeInsets.all(12), child: Icon(Icons.shield_rounded, color: RnColors.lemon)),
-        const SizedBox(width: 12),
-        const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('RN', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
-          Text('Liquid privacy browser', style: TextStyle(color: Colors.white60, fontSize: 12)),
-        ]),
-        const Spacer(),
-        GlassPanel(radius: 999, padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8), child: const Text('Beta 0.5', style: TextStyle(color: RnColors.lemon, fontWeight: FontWeight.w900))),
-      ],
-    );
+    return Row(children: [
+      const GlassPanel(radius: 18, padding: EdgeInsets.all(12), child: Icon(Icons.shield_rounded, color: RnColors.lemon)),
+      const SizedBox(width: 12),
+      const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('RN', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
+        Text('Liquid privacy browser', style: TextStyle(color: Colors.white60, fontSize: 12)),
+      ]),
+      const Spacer(),
+      GlassPanel(radius: 999, padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8), child: const Text('Beta 0.5', style: TextStyle(color: RnColors.lemon, fontWeight: FontWeight.w900))),
+    ]);
   }
 }
 
@@ -195,33 +242,31 @@ class HeroCard extends StatelessWidget {
       padding: EdgeInsets.zero,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(34),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Image.network('https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=1200&q=80', fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: const Color(0xFF0D150D))),
-            Container(decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0x22000000), Color(0xEE050705)]))),
-            Positioned(
-              left: 22,
-              right: 22,
-              bottom: 24,
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [
-                Text('Secure spaces for shared phones', style: TextStyle(fontSize: 37, height: .98, fontWeight: FontWeight.w900)),
-                SizedBox(height: 14),
-                Text('My Space and Guest Space keep sessions separated with secure defaults.', style: TextStyle(color: Colors.white70, fontSize: 15, height: 1.35)),
-                SizedBox(height: 15),
-                Wrap(spacing: 9, runSpacing: 9, children: [FeaturePill(label: '2 Spaces'), FeaturePill(label: 'Secure'), FeaturePill(label: 'No forced login'), FeaturePill(label: 'Glass UI')]),
-              ]),
-            )
-          ],
-        ),
+        child: Stack(fit: StackFit.expand, children: [
+          Image.network('https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=1200&q=80', fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: const Color(0xFF0D150D))),
+          Container(decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0x22000000), Color(0xEE050705)]))),
+          Positioned(
+            left: 22,
+            right: 22,
+            bottom: 24,
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [
+              Text('Secure spaces for shared phones', style: TextStyle(fontSize: 37, height: .98, fontWeight: FontWeight.w900)),
+              SizedBox(height: 14),
+              Text('My Space and Guest Space keep sessions separated with secure defaults.', style: TextStyle(color: Colors.white70, fontSize: 15, height: 1.35)),
+              SizedBox(height: 15),
+              Wrap(spacing: 9, runSpacing: 9, children: [FeaturePill(label: '2 Spaces'), FeaturePill(label: 'Secure'), FeaturePill(label: 'No forced login'), FeaturePill(label: 'Glass UI')]),
+            ]),
+          )
+        ]),
       ),
     );
   }
 }
 
 class BrowserScreen extends StatefulWidget {
-  const BrowserScreen({super.key, required this.profile, required this.onProfileChanged});
+  const BrowserScreen({super.key, required this.profile, required this.settings, required this.onProfileChanged});
   final String profile;
+  final RnBrowserSettings settings;
   final ValueChanged<String> onProfileChanged;
 
   @override
@@ -230,13 +275,12 @@ class BrowserScreen extends StatefulWidget {
 
 class _BrowserScreenState extends State<BrowserScreen> {
   final TextEditingController address = TextEditingController(text: 'https://duckduckgo.com');
-  final List<String> history = ['https://duckduckgo.com'];
-  int pointer = 0;
+  InAppWebViewController? controller;
+  String url = 'https://duckduckgo.com';
+  double progress = 1;
+  bool canBack = false;
+  bool canForward = false;
   bool menuOpen = false;
-
-  String get url => history[pointer];
-  bool get canBack => pointer > 0;
-  bool get canForward => pointer < history.length - 1;
 
   @override
   void dispose() {
@@ -244,44 +288,144 @@ class _BrowserScreenState extends State<BrowserScreen> {
     super.dispose();
   }
 
-  void openAddress() {
+  @override
+  void didUpdateWidget(covariant BrowserScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.settings != widget.settings) {
+      applyWebSettings();
+    }
+  }
+
+  Future<void> openAddress() async {
     final raw = address.text.trim();
     if (raw.isEmpty) return;
     final next = raw.startsWith('http://') || raw.startsWith('https://') ? raw : 'https://duckduckgo.com/?q=${Uri.encodeComponent(raw)}';
+    address.text = next;
+    await controller?.loadUrl(urlRequest: URLRequest(url: WebUri(next)));
+  }
+
+  Future<void> updateNav() async {
+    final c = controller;
+    if (c == null) return;
+    final back = await c.canGoBack();
+    final forward = await c.canGoForward();
+    final current = await c.getUrl();
+    if (!mounted) return;
     setState(() {
-      if (pointer < history.length - 1) history.removeRange(pointer + 1, history.length);
-      history.add(next);
-      pointer = history.length - 1;
-      address.text = next;
+      canBack = back;
+      canForward = forward;
+      if (current != null) {
+        url = current.toString();
+        address.text = url;
+      }
     });
   }
 
-  void goBack() => setState(() { if (canBack) { pointer--; address.text = url; } });
-  void goForward() => setState(() { if (canForward) { pointer++; address.text = url; } });
-  void goHome() => setState(() { history.add('https://duckduckgo.com'); pointer = history.length - 1; address.text = url; });
+  bool get zoomAllowed {
+    if (!widget.settings.pinchAllowList) return true;
+    final host = Uri.tryParse(url)?.host ?? '';
+    return host.contains('wikipedia.org') || host.contains('github.com') || host.contains('docs.flutter.dev');
+  }
+
+  Future<void> applyWebSettings() async {
+    final c = controller;
+    if (c == null) return;
+    await c.setSettings(settings: InAppWebViewSettings(
+      supportZoom: zoomAllowed,
+      builtInZoomControls: zoomAllowed,
+      displayZoomControls: false,
+      geolocationEnabled: widget.settings.regionMode,
+      thirdPartyCookiesEnabled: false,
+      mediaPlaybackRequiresUserGesture: true,
+      userAgent: widget.settings.desktopSite ? 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124 Safari/537.36 RNBrowser/0.5' : null,
+    ));
+    final scale = widget.settings.zoom / 100;
+    await c.evaluateJavascript(source: """
+      try {
+        document.documentElement.style.zoom = '$scale';
+        document.body.style.zoom = '$scale';
+        ${widget.settings.darkWebPages ? "document.documentElement.style.filter = 'contrast(1.02) brightness(0.88)';" : "document.documentElement.style.filter = '';"}
+      } catch (e) {}
+    """);
+    if (widget.settings.regionMode) {
+      await c.evaluateJavascript(source: regionScript());
+    }
+  }
+
+  String regionScript() {
+    return """
+      try {
+        const rnCoords = { latitude: 6.5244, longitude: 3.3792, accuracy: 7000 };
+        navigator.geolocation.getCurrentPosition = function(success) { success({ coords: rnCoords, timestamp: Date.now() }); };
+        navigator.geolocation.watchPosition = function(success) { success({ coords: rnCoords, timestamp: Date.now() }); return 1; };
+        navigator.geolocation.clearWatch = function() {};
+      } catch (e) {}
+    """;
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: RnColors.black,
-      body: Stack(
-        children: [
-          SafeArea(
-            bottom: false,
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-                  child: BrowserTopBar(profile: widget.profile, onProfileChanged: widget.onProfileChanged, address: address, onSubmit: openAddress, onMenu: () => setState(() => menuOpen = true)),
-                ),
-                Expanded(child: BrowserPreview(url: url, profile: widget.profile)),
-              ],
+      body: Stack(children: [
+        SafeArea(
+          bottom: false,
+          child: Column(children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+              child: Column(children: [
+                BrowserTopBar(profile: widget.profile, onProfileChanged: widget.onProfileChanged, address: address, onSubmit: openAddress, onMenu: () => setState(() => menuOpen = true)),
+                if (progress < 1) Padding(padding: const EdgeInsets.only(top: 8), child: LinearProgressIndicator(value: progress, minHeight: 2, color: RnColors.lemon, backgroundColor: Colors.white10)),
+              ]),
             ),
-          ),
-          Positioned(left: 18, right: 18, bottom: 98, child: BrowserControls(canBack: canBack, canForward: canForward, onBack: goBack, onForward: goForward, onHome: goHome, onRefresh: openAddress)),
-          if (menuOpen) SlideMenu(onClose: () => setState(() => menuOpen = false)),
-        ],
-      ),
+            Expanded(
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                child: InAppWebView(
+                  initialUrlRequest: URLRequest(url: WebUri(url)),
+                  initialSettings: InAppWebViewSettings(
+                    javaScriptEnabled: true,
+                    transparentBackground: false,
+                    useShouldOverrideUrlLoading: true,
+                    supportZoom: zoomAllowed,
+                    builtInZoomControls: zoomAllowed,
+                    displayZoomControls: false,
+                    geolocationEnabled: widget.settings.regionMode,
+                    thirdPartyCookiesEnabled: false,
+                    mediaPlaybackRequiresUserGesture: true,
+                  ),
+                  onWebViewCreated: (c) => controller = c,
+                  onLoadStart: (_, current) {
+                    if (current == null) return;
+                    setState(() {
+                      url = current.toString();
+                      address.text = url;
+                    });
+                  },
+                  onLoadStop: (_, __) async {
+                    await updateNav();
+                    await applyWebSettings();
+                  },
+                  onProgressChanged: (_, value) => setState(() => progress = value / 100),
+                  onPermissionRequest: (_, request) async {
+                    final allowed = <PermissionResourceType>[];
+                    for (final resource in request.resources) {
+                      if (resource == PermissionResourceType.MICROPHONE && widget.settings.mic) allowed.add(resource);
+                      if (resource == PermissionResourceType.CAMERA && widget.settings.camera) allowed.add(resource);
+                    }
+                    return PermissionResponse(resources: allowed, action: allowed.isEmpty ? PermissionResponseAction.DENY : PermissionResponseAction.GRANT);
+                  },
+                  onGeolocationPermissionsShowPrompt: (_, origin) async {
+                    return GeolocationPermissionShowPromptResponse(origin: origin, allow: widget.settings.regionMode, retain: false);
+                  },
+                ),
+              ),
+            ),
+          ]),
+        ),
+        Positioned(left: 18, right: 18, bottom: 98, child: BrowserControls(canBack: canBack, canForward: canForward, onBack: () => controller?.goBack(), onForward: () => controller?.goForward(), onHome: () => controller?.loadUrl(urlRequest: URLRequest(url: WebUri('https://duckduckgo.com'))), onRefresh: () => controller?.reload())),
+        if (menuOpen) SlideMenu(onClose: () => setState(() => menuOpen = false), onNewTab: () { setState(() => menuOpen = false); controller?.loadUrl(urlRequest: URLRequest(url: WebUri('https://duckduckgo.com'))); }),
+      ]),
     );
   }
 }
@@ -304,18 +448,7 @@ class BrowserTopBar extends StatelessWidget {
       ]),
       const SizedBox(height: 10),
       Row(children: [
-        Expanded(
-          child: GlassPanel(
-            radius: 999,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            child: TextField(
-              controller: address,
-              onSubmitted: (_) => onSubmit(),
-              textInputAction: TextInputAction.go,
-              decoration: const InputDecoration(border: InputBorder.none, prefixIcon: Icon(Icons.lock_rounded, color: RnColors.lemon), hintText: 'Search or enter address'),
-            ),
-          ),
-        ),
+        Expanded(child: GlassPanel(radius: 999, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), child: TextField(controller: address, onSubmitted: (_) => onSubmit(), textInputAction: TextInputAction.go, decoration: const InputDecoration(border: InputBorder.none, prefixIcon: Icon(Icons.lock_rounded, color: RnColors.lemon), hintText: 'Search or enter address')))),
         const SizedBox(width: 10),
         GlassPanel(radius: 18, padding: EdgeInsets.zero, child: IconButton(onPressed: onMenu, icon: const Icon(Icons.menu_rounded, color: RnColors.lemon))),
       ]),
@@ -323,59 +456,12 @@ class BrowserTopBar extends StatelessWidget {
   }
 }
 
-class BrowserPreview extends StatelessWidget {
-  const BrowserPreview({super.key, required this.url, required this.profile});
-  final String url;
+class SettingsScreen extends StatelessWidget {
+  const SettingsScreen({super.key, required this.profile, required this.settings, required this.onProfileChanged, required this.onSettingsChanged});
   final String profile;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 0, 14, 178),
-      child: GlassPanel(
-        radius: 28,
-        padding: const EdgeInsets.all(18),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [const Icon(Icons.public_rounded, color: RnColors.lemon), const SizedBox(width: 8), Expanded(child: Text(url, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800)))]),
-          const SizedBox(height: 18),
-          Expanded(
-            child: Container(
-              width: double.infinity,
-              decoration: BoxDecoration(borderRadius: BorderRadius.circular(24), gradient: const LinearGradient(colors: [Color(0xFF101910), Color(0xFF070A07)]), border: Border.all(color: RnColors.border)),
-              padding: const EdgeInsets.all(18),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(profile, style: const TextStyle(color: RnColors.lemon, fontWeight: FontWeight.w900)),
-                const SizedBox(height: 12),
-                const Text('RN beta browser canvas', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w900)),
-                const SizedBox(height: 12),
-                const Text('This shell is ready for WebView wiring. It already includes liquid glass styling, profiles, URL input, settings toggles, menu, and Android-style navigation controls.', style: TextStyle(color: Colors.white70, height: 1.4)),
-                const Spacer(),
-                const Wrap(spacing: 10, runSpacing: 10, children: [FeaturePill(label: 'Location Shield'), FeaturePill(label: 'Files'), FeaturePill(label: 'Mic Control'), FeaturePill(label: 'Zoom Rules')]),
-              ]),
-            ),
-          )
-        ]),
-      ),
-    );
-  }
-}
-
-class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key, required this.profile, required this.onProfileChanged});
-  final String profile;
+  final RnBrowserSettings settings;
   final ValueChanged<String> onProfileChanged;
-
-  @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
-}
-
-class _SettingsScreenState extends State<SettingsScreen> {
-  bool mic = false;
-  bool files = true;
-  bool region = false;
-  bool pinchAllowList = true;
-  bool clearOnExit = true;
-  double zoom = 100;
+  final ValueChanged<RnBrowserSettings> onSettingsChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -385,18 +471,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: ListView(padding: const EdgeInsets.fromLTRB(18, 18, 18, 112), children: [
           const Text('Settings', style: TextStyle(fontSize: 34, fontWeight: FontWeight.w900)),
           const SizedBox(height: 10),
-          Row(children: [ProfileChip(label: 'My Space', selected: widget.profile == 'My Space', onTap: () => widget.onProfileChanged('My Space')), const SizedBox(width: 8), ProfileChip(label: 'Guest Space', selected: widget.profile == 'Guest Space', onTap: () => widget.onProfileChanged('Guest Space'))]),
+          Row(children: [ProfileChip(label: 'My Space', selected: profile == 'My Space', onTap: () => onProfileChanged('My Space')), const SizedBox(width: 8), ProfileChip(label: 'Guest Space', selected: profile == 'Guest Space', onTap: () => onProfileChanged('Guest Space'))]),
           const SizedBox(height: 16),
-          ToggleCard(title: 'Access to mic', subtitle: 'Let selected websites request microphone access.', value: mic, onChanged: (v) => setState(() => mic = v)),
-          ToggleCard(title: 'Access gallery/files', subtitle: 'Allow uploads from Android gallery or file picker.', value: files, onChanged: (v) => setState(() => files = v)),
-          ToggleCard(title: 'Region mode', subtitle: 'Use browser region mode instead of real location by default.', value: region, onChanged: (v) => setState(() => region = v)),
-          ToggleCard(title: 'Pinch zoom allowlist', subtitle: 'Pinch to zoom only on selected websites.', value: pinchAllowList, onChanged: (v) => setState(() => pinchAllowList = v)),
-          ToggleCard(title: 'Clear on exit', subtitle: 'Clear temporary browsing data when leaving a space.', value: clearOnExit, onChanged: (v) => setState(() => clearOnExit = v)),
+          ToggleCard(title: 'Access to mic', subtitle: 'Let selected websites request microphone access.', value: settings.mic, onChanged: (v) => onSettingsChanged(settings.copyWith(mic: v))),
+          ToggleCard(title: 'Access to camera', subtitle: 'Let selected websites request camera access.', value: settings.camera, onChanged: (v) => onSettingsChanged(settings.copyWith(camera: v))),
+          ToggleCard(title: 'Access gallery/files', subtitle: 'Allow Android gallery or file picker uploads.', value: settings.files, onChanged: (v) => onSettingsChanged(settings.copyWith(files: v))),
+          ToggleCard(title: 'Region mode', subtitle: 'Use browser region mode instead of real location by default.', value: settings.regionMode, onChanged: (v) => onSettingsChanged(settings.copyWith(regionMode: v))),
+          ToggleCard(title: 'Pinch zoom allowlist', subtitle: 'Pinch to zoom only on selected websites.', value: settings.pinchAllowList, onChanged: (v) => onSettingsChanged(settings.copyWith(pinchAllowList: v))),
+          ToggleCard(title: 'Desktop site', subtitle: 'Request desktop pages for the active space.', value: settings.desktopSite, onChanged: (v) => onSettingsChanged(settings.copyWith(desktopSite: v))),
+          ToggleCard(title: 'Dark page filter', subtitle: 'Slightly dim bright pages inside the browser.', value: settings.darkWebPages, onChanged: (v) => onSettingsChanged(settings.copyWith(darkWebPages: v))),
+          ToggleCard(title: 'Clear on profile switch', subtitle: 'Clear cookies and web storage when switching spaces.', value: settings.clearOnExit, onChanged: (v) => onSettingsChanged(settings.copyWith(clearOnExit: v))),
           const SizedBox(height: 12),
           GlassPanel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Text('Region zoom', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-            Text('${zoom.round()}%', style: const TextStyle(color: Colors.white70)),
-            Slider(min: 50, max: 150, value: zoom, activeColor: RnColors.lemon, onChanged: (v) => setState(() => zoom = v)),
+            Text('${settings.zoom.round()}%', style: const TextStyle(color: Colors.white70)),
+            Slider(min: 50, max: 150, value: settings.zoom, activeColor: RnColors.lemon, onChanged: (v) => onSettingsChanged(settings.copyWith(zoom: v))),
           ])),
         ]),
       ),
@@ -450,49 +539,49 @@ class BrowserControls extends StatelessWidget {
 }
 
 class SlideMenu extends StatelessWidget {
-  const SlideMenu({super.key, required this.onClose});
+  const SlideMenu({super.key, required this.onClose, required this.onNewTab});
   final VoidCallback onClose;
+  final VoidCallback onNewTab;
 
   @override
   Widget build(BuildContext context) {
-    return Positioned.fill(
-      child: Stack(children: [
-        GestureDetector(onTap: onClose, child: Container(color: Colors.black54)),
-        Align(
-          alignment: Alignment.centerRight,
-          child: SafeArea(
-            child: Container(
-              width: MediaQuery.of(context).size.width * .78,
-              margin: const EdgeInsets.only(right: 12, bottom: 95),
-              child: GlassPanel(radius: 32, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [const Text('RN MENU', style: TextStyle(color: RnColors.lemon, fontWeight: FontWeight.w900, fontSize: 20)), const Spacer(), IconButton(onPressed: onClose, icon: const Icon(Icons.close_rounded, color: RnColors.cyan))]),
-                const Divider(color: Colors.white12),
-                const MenuRow(icon: Icons.add_rounded, label: 'New Tab'),
-                const MenuRow(icon: Icons.star_border_rounded, label: 'Bookmarks'),
-                const MenuRow(icon: Icons.history_rounded, label: 'History'),
-                const MenuRow(icon: Icons.download_rounded, label: 'Downloads'),
-                const MenuRow(icon: Icons.favorite_border_rounded, label: 'Favorites'),
-                const Divider(color: Colors.white12),
-                const MenuRow(icon: Icons.visibility_off_rounded, label: 'Incognito Mode'),
-                const MenuRow(icon: Icons.desktop_windows_rounded, label: 'Desktop Site'),
-                const MenuRow(icon: Icons.tune_rounded, label: 'Customize'),
-              ])),
-            ),
+    return Positioned.fill(child: Stack(children: [
+      GestureDetector(onTap: onClose, child: Container(color: Colors.black54)),
+      Align(
+        alignment: Alignment.centerRight,
+        child: SafeArea(
+          child: Container(
+            width: MediaQuery.of(context).size.width * .78,
+            margin: const EdgeInsets.only(right: 12, bottom: 95),
+            child: GlassPanel(radius: 32, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [const Text('RN MENU', style: TextStyle(color: RnColors.lemon, fontWeight: FontWeight.w900, fontSize: 20)), const Spacer(), IconButton(onPressed: onClose, icon: const Icon(Icons.close_rounded, color: RnColors.cyan))]),
+              const Divider(color: Colors.white12),
+              MenuRow(icon: Icons.add_rounded, label: 'New Tab', onTap: onNewTab),
+              const MenuRow(icon: Icons.star_border_rounded, label: 'Bookmarks'),
+              const MenuRow(icon: Icons.history_rounded, label: 'History'),
+              const MenuRow(icon: Icons.download_rounded, label: 'Downloads'),
+              const MenuRow(icon: Icons.favorite_border_rounded, label: 'Favorites'),
+              const Divider(color: Colors.white12),
+              const MenuRow(icon: Icons.visibility_off_rounded, label: 'Incognito Mode'),
+              const MenuRow(icon: Icons.desktop_windows_rounded, label: 'Desktop Site'),
+              const MenuRow(icon: Icons.tune_rounded, label: 'Customize'),
+            ])),
           ),
         ),
-      ]),
-    );
+      ),
+    ]));
   }
 }
 
 class MenuRow extends StatelessWidget {
-  const MenuRow({super.key, required this.icon, required this.label});
+  const MenuRow({super.key, required this.icon, required this.label, this.onTap});
   final IconData icon;
   final String label;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Row(children: [Icon(icon, color: RnColors.lemon), const SizedBox(width: 14), Expanded(child: Text(label, style: const TextStyle(fontWeight: FontWeight.w800))), const Icon(Icons.chevron_right_rounded)]));
+    return InkWell(onTap: onTap, borderRadius: BorderRadius.circular(14), child: Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Row(children: [Icon(icon, color: RnColors.lemon), const SizedBox(width: 14), Expanded(child: Text(label, style: const TextStyle(fontWeight: FontWeight.w800))), const Icon(Icons.chevron_right_rounded)])));
   }
 }
 
@@ -503,14 +592,11 @@ class RnGlassNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 0, 18, 20),
-      child: GlassPanel(radius: 34, padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10), child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-        NavButton(icon: Icons.home_rounded, selected: index == 0, onTap: () => onChanged(0)),
-        NavButton(icon: Icons.public_rounded, selected: index == 1, onTap: () => onChanged(1)),
-        NavButton(icon: Icons.tune_rounded, selected: index == 2, onTap: () => onChanged(2)),
-      ])),
-    );
+    return Padding(padding: const EdgeInsets.fromLTRB(18, 0, 18, 20), child: GlassPanel(radius: 34, padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10), child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
+      NavButton(icon: Icons.home_rounded, selected: index == 0, onTap: () => onChanged(0)),
+      NavButton(icon: Icons.public_rounded, selected: index == 1, onTap: () => onChanged(1)),
+      NavButton(icon: Icons.tune_rounded, selected: index == 2, onTap: () => onChanged(2)),
+    ])));
   }
 }
 
