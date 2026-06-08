@@ -34,12 +34,13 @@ class RnBrowserApp extends StatelessWidget {
 }
 
 class RnColors {
-  static const black = Color(0xFF050705);
-  static const panel = Color(0xCC10160F);
-  static const lemon = Color(0xFFC7FF3A);
+  static const black = Color(0xFF000402);
+  static const panel = Color(0xDD071509);
+  static const lemon = Color(0xFFC7FF2E);
   static const cyan = Color(0xFF50F6D7);
   static const pink = Color(0xFFFF4FD2);
-  static const border = Color(0x553CFF68);
+  static const border = Color(0x6631D957);
+  static const muted = Color(0xFFB8C4B5);
 }
 
 class RnProfileStore {
@@ -138,6 +139,8 @@ class RnBrowserSettings {
   }
 }
 
+enum RnPage { start, browser, settings }
+
 class RnShell extends StatefulWidget {
   const RnShell({super.key, required this.initialSettings, required this.initialProfile});
 
@@ -149,9 +152,9 @@ class RnShell extends StatefulWidget {
 }
 
 class _RnShellState extends State<RnShell> {
-  int index = 0;
   late String profile;
   late RnBrowserSettings settings;
+  RnPage page = RnPage.start;
 
   @override
   void initState() {
@@ -177,44 +180,13 @@ class _RnShellState extends State<RnShell> {
 
   @override
   Widget build(BuildContext context) {
-    final pages = [
-      StartScreen(onStart: () => setState(() => index = 1)),
-      BrowserScreen(profile: profile, settings: settings, onProfileChanged: changeProfile),
-      SettingsScreen(profile: profile, settings: settings, onProfileChanged: changeProfile, onSettingsChanged: updateSettings),
-    ];
-
-    return Scaffold(
-      extendBody: true,
-      body: IndexedStack(index: index, children: pages),
-      bottomNavigationBar: RnGlassNav(index: index, onChanged: (v) => setState(() => index = v)),
-    );
-  }
-}
-
-class GlassPanel extends StatelessWidget {
-  const GlassPanel({super.key, required this.child, this.padding = const EdgeInsets.all(16), this.radius = 26});
-  final Widget child;
-  final EdgeInsets padding;
-  final double radius;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(radius),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-        child: Container(
-          padding: padding,
-          decoration: BoxDecoration(
-            color: RnColors.panel,
-            borderRadius: BorderRadius.circular(radius),
-            border: Border.all(color: RnColors.border, width: 1.2),
-            boxShadow: const [BoxShadow(color: Color(0x331DFF75), blurRadius: 22, spreadRadius: 1)],
-          ),
-          child: child,
-        ),
-      ),
-    );
+    if (page == RnPage.start) {
+      return StartScreen(onStart: () => setState(() => page = RnPage.browser));
+    }
+    if (page == RnPage.settings) {
+      return SettingsScreen(profile: profile, settings: settings, onProfileChanged: changeProfile, onSettingsChanged: updateSettings, onBack: () => setState(() => page = RnPage.browser));
+    }
+    return BrowserScreen(profile: profile, settings: settings, onProfileChanged: changeProfile, onOpenSettings: () => setState(() => page = RnPage.settings));
   }
 }
 
@@ -230,12 +202,22 @@ class StartScreen extends StatelessWidget {
         const StartBackdrop(),
         SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 14, 18, 112),
+            padding: const EdgeInsets.fromLTRB(22, 20, 22, 24),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               const BrandRow(),
+              const SizedBox(height: 28),
+              const Text('Welcome to RN', style: TextStyle(fontSize: 42, fontWeight: FontWeight.w900, height: .98)),
               const SizedBox(height: 18),
-              const Expanded(child: HeroCard()),
-              const SizedBox(height: 18),
+              const Text('RN provides a secure and private browsing experience built around isolated browser spaces. Each space keeps its own cookies, sessions, and privacy settings, making it safer to share one phone without mixing accounts, activity, or browsing data.', style: TextStyle(color: RnColors.muted, height: 1.45, fontSize: 15.5)),
+              const SizedBox(height: 22),
+              const Wrap(spacing: 9, runSpacing: 10, children: [
+                FeaturePill(label: '2 Spaces'),
+                FeaturePill(label: 'Isolated Cookies'),
+                FeaturePill(label: 'Private Sessions'),
+                FeaturePill(label: 'No Forced Login'),
+                FeaturePill(label: 'Security Controls'),
+              ]),
+              const Spacer(),
               SizedBox(
                 width: double.infinity,
                 height: 62,
@@ -245,37 +227,16 @@ class StartScreen extends StatelessWidget {
                   child: const Text('Start Secure Browsing', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 14),
               Center(child: TextButton.icon(onPressed: () {}, icon: const Icon(Icons.sync_lock_rounded, size: 18), label: const Text('Login / Sync'), style: TextButton.styleFrom(foregroundColor: RnColors.lemon))),
+              const Center(child: Text('Optional. RN works without an account.', style: TextStyle(color: RnColors.muted, fontSize: 12.5))),
+              const SizedBox(height: 22),
+              const Center(child: Text('RN by TEKDEV', style: TextStyle(color: RnColors.lemon, fontWeight: FontWeight.w800, letterSpacing: .4))),
             ]),
           ),
         ),
       ]),
     );
-  }
-}
-
-class StartBackdrop extends StatelessWidget {
-  const StartBackdrop({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(children: [
-      Positioned.fill(child: Container(decoration: const BoxDecoration(gradient: RadialGradient(center: Alignment.topRight, radius: 1.1, colors: [Color(0x443CFF68), Color(0x00000000)])))),
-      Positioned(top: 95, right: -60, child: GlowBlob(size: 240, color: RnColors.lemon)),
-      Positioned(bottom: 130, left: -80, child: GlowBlob(size: 220, color: RnColors.cyan)),
-    ]);
-  }
-}
-
-class GlowBlob extends StatelessWidget {
-  const GlowBlob({super.key, required this.size, required this.color});
-  final double size;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(width: size, height: size, decoration: BoxDecoration(shape: BoxShape.circle, color: color.withOpacity(.13), boxShadow: [BoxShadow(color: color.withOpacity(.22), blurRadius: 80, spreadRadius: 16)]));
   }
 }
 
@@ -288,51 +249,34 @@ class BrandRow extends StatelessWidget {
       const GlassPanel(radius: 18, padding: EdgeInsets.all(12), child: Icon(Icons.shield_rounded, color: RnColors.lemon)),
       const SizedBox(width: 12),
       const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('RN', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
-        Text('Liquid privacy browser', style: TextStyle(color: Colors.white60, fontSize: 12)),
+        Text('RN', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
+        Text('Privacy-first browser', style: TextStyle(color: RnColors.muted, fontSize: 13)),
       ]),
       const Spacer(),
-      GlassPanel(radius: 999, padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8), child: const Text('Beta 0.5', style: TextStyle(color: RnColors.lemon, fontWeight: FontWeight.w900))),
+      GlassPanel(radius: 999, padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 9), child: const Text('Beta 0.6', style: TextStyle(color: RnColors.lemon, fontWeight: FontWeight.w900))),
     ]);
   }
 }
 
-class HeroCard extends StatelessWidget {
-  const HeroCard({super.key});
+class StartBackdrop extends StatelessWidget {
+  const StartBackdrop({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return GlassPanel(
-      radius: 34,
-      padding: EdgeInsets.zero,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(34),
-        child: Stack(fit: StackFit.expand, children: [
-          Image.network('https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=1200&q=80', fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: const Color(0xFF0D150D))),
-          Container(decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0x22000000), Color(0xEE050705)]))),
-          Positioned(
-            left: 22,
-            right: 22,
-            bottom: 24,
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [
-              Text('Secure spaces for shared phones', style: TextStyle(fontSize: 37, height: .98, fontWeight: FontWeight.w900)),
-              SizedBox(height: 14),
-              Text('My Space and Guest Space keep sessions separated with secure defaults.', style: TextStyle(color: Colors.white70, fontSize: 15, height: 1.35)),
-              SizedBox(height: 15),
-              Wrap(spacing: 9, runSpacing: 9, children: [FeaturePill(label: '2 Spaces'), FeaturePill(label: 'Secure'), FeaturePill(label: 'No forced login'), FeaturePill(label: 'Glass UI')]),
-            ]),
-          )
-        ]),
-      ),
-    );
+    return Stack(children: [
+      Positioned.fill(child: Container(decoration: const BoxDecoration(gradient: RadialGradient(center: Alignment.topRight, radius: 1.2, colors: [Color(0x3325FF52), Color(0x00000000)])))),
+      Positioned(bottom: -50, left: -70, child: GlowBlob(size: 260, color: RnColors.cyan)),
+      Positioned(top: 120, right: -95, child: GlowBlob(size: 260, color: RnColors.lemon)),
+    ]);
   }
 }
 
 class BrowserScreen extends StatefulWidget {
-  const BrowserScreen({super.key, required this.profile, required this.settings, required this.onProfileChanged});
+  const BrowserScreen({super.key, required this.profile, required this.settings, required this.onProfileChanged, required this.onOpenSettings});
   final String profile;
   final RnBrowserSettings settings;
   final ValueChanged<String> onProfileChanged;
+  final VoidCallback onOpenSettings;
 
   @override
   State<BrowserScreen> createState() => _BrowserScreenState();
@@ -356,9 +300,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
   @override
   void didUpdateWidget(covariant BrowserScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.settings != widget.settings) {
-      applyWebSettings();
-    }
+    if (oldWidget.settings != widget.settings) applyWebSettings();
   }
 
   Future<void> openAddress() async {
@@ -402,30 +344,10 @@ class _BrowserScreenState extends State<BrowserScreen> {
       geolocationEnabled: widget.settings.regionMode,
       thirdPartyCookiesEnabled: false,
       mediaPlaybackRequiresUserGesture: true,
-      userAgent: widget.settings.desktopSite ? 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124 Safari/537.36 RNBrowser/0.5' : null,
+      userAgent: widget.settings.desktopSite ? 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124 Safari/537.36 RNBrowser/0.6' : null,
     ));
     final scale = widget.settings.zoom / 100;
-    await c.evaluateJavascript(source: """
-      try {
-        document.documentElement.style.zoom = '$scale';
-        document.body.style.zoom = '$scale';
-        ${widget.settings.darkWebPages ? "document.documentElement.style.filter = 'contrast(1.02) brightness(0.88)';" : "document.documentElement.style.filter = '';"}
-      } catch (e) {}
-    """);
-    if (widget.settings.regionMode) {
-      await c.evaluateJavascript(source: regionScript());
-    }
-  }
-
-  String regionScript() {
-    return """
-      try {
-        const rnCoords = { latitude: 6.5244, longitude: 3.3792, accuracy: 7000 };
-        navigator.geolocation.getCurrentPosition = function(success) { success({ coords: rnCoords, timestamp: Date.now() }); };
-        navigator.geolocation.watchPosition = function(success) { success({ coords: rnCoords, timestamp: Date.now() }); return 1; };
-        navigator.geolocation.clearWatch = function() {};
-      } catch (e) {}
-    """;
+    await c.evaluateJavascript(source: "try{document.documentElement.style.zoom='$scale';document.body.style.zoom='$scale';}catch(e){};");
   }
 
   @override
@@ -437,20 +359,17 @@ class _BrowserScreenState extends State<BrowserScreen> {
           bottom: false,
           child: Column(children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-              child: Column(children: [
-                BrowserTopBar(profile: widget.profile, onProfileChanged: widget.onProfileChanged, address: address, onSubmit: openAddress, onMenu: () => setState(() => menuOpen = true)),
-                if (progress < 1) Padding(padding: const EdgeInsets.only(top: 8), child: LinearProgressIndicator(value: progress, minHeight: 2, color: RnColors.lemon, backgroundColor: Colors.white10)),
-              ]),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+              child: BrowserTopBar(profile: widget.profile, onProfileChanged: widget.onProfileChanged, address: address, onSubmit: openAddress, onMenu: () => setState(() => menuOpen = true)),
             ),
+            if (progress < 1) LinearProgressIndicator(value: progress, minHeight: 2, color: RnColors.lemon, backgroundColor: Colors.white10),
             Expanded(
               child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
                 child: InAppWebView(
                   initialUrlRequest: URLRequest(url: WebUri(url)),
                   initialSettings: InAppWebViewSettings(
                     javaScriptEnabled: true,
-                    transparentBackground: false,
                     useShouldOverrideUrlLoading: true,
                     supportZoom: zoomAllowed,
                     builtInZoomControls: zoomAllowed,
@@ -488,8 +407,8 @@ class _BrowserScreenState extends State<BrowserScreen> {
             ),
           ]),
         ),
-        Positioned(left: 18, right: 18, bottom: 98, child: BrowserControls(canBack: canBack, canForward: canForward, onBack: () => controller?.goBack(), onForward: () => controller?.goForward(), onHome: () => controller?.loadUrl(urlRequest: URLRequest(url: WebUri('https://duckduckgo.com'))), onRefresh: () => controller?.reload())),
-        if (menuOpen) SlideMenu(onClose: () => setState(() => menuOpen = false), onNewTab: () { setState(() => menuOpen = false); controller?.loadUrl(urlRequest: URLRequest(url: WebUri('https://duckduckgo.com'))); }),
+        Positioned(left: 18, right: 18, bottom: 24, child: BrowserControls(canBack: canBack, canForward: canForward, onBack: () => controller?.goBack(), onForward: () => controller?.goForward(), onHome: () => controller?.loadUrl(urlRequest: URLRequest(url: WebUri('https://duckduckgo.com'))), onRefresh: () => controller?.reload())),
+        if (menuOpen) SlideMenu(onClose: () => setState(() => menuOpen = false), onNewTab: () { setState(() => menuOpen = false); controller?.loadUrl(urlRequest: URLRequest(url: WebUri('https://duckduckgo.com'))); }, onSettings: () { setState(() => menuOpen = false); widget.onOpenSettings(); }),
       ]),
     );
   }
@@ -505,16 +424,16 @@ class BrowserTopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(children: [
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
         ProfileChip(label: 'My Space', selected: profile == 'My Space', onTap: () => onProfileChanged('My Space')),
-        const SizedBox(width: 8),
+        const SizedBox(width: 10),
         ProfileChip(label: 'Guest Space', selected: profile == 'Guest Space', onTap: () => onProfileChanged('Guest Space')),
       ]),
-      const SizedBox(height: 10),
+      const SizedBox(height: 14),
       Row(children: [
-        Expanded(child: GlassPanel(radius: 999, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), child: TextField(controller: address, onSubmitted: (_) => onSubmit(), textInputAction: TextInputAction.go, decoration: const InputDecoration(border: InputBorder.none, prefixIcon: Icon(Icons.lock_rounded, color: RnColors.lemon), hintText: 'Search or enter address')))),
-        const SizedBox(width: 10),
+        Expanded(child: GlassPanel(radius: 26, padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 5), child: TextField(controller: address, onSubmitted: (_) => onSubmit(), textInputAction: TextInputAction.go, decoration: const InputDecoration(border: InputBorder.none, prefixIcon: Icon(Icons.lock_rounded, color: RnColors.lemon), hintText: 'Search or enter address')))),
+        const SizedBox(width: 12),
         GlassPanel(radius: 18, padding: EdgeInsets.zero, child: IconButton(onPressed: onMenu, icon: const Icon(Icons.menu_rounded, color: RnColors.lemon))),
       ]),
     ]);
@@ -522,40 +441,101 @@ class BrowserTopBar extends StatelessWidget {
 }
 
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key, required this.profile, required this.settings, required this.onProfileChanged, required this.onSettingsChanged});
+  const SettingsScreen({super.key, required this.profile, required this.settings, required this.onProfileChanged, required this.onSettingsChanged, required this.onBack});
   final String profile;
   final RnBrowserSettings settings;
   final ValueChanged<String> onProfileChanged;
   final ValueChanged<RnBrowserSettings> onSettingsChanged;
+  final VoidCallback onBack;
 
   @override
   Widget build(BuildContext context) {
+    final website = ['Microphone Access', 'Camera Access', 'Gallery and File Access', 'Location Access', 'Notifications', 'Clipboard Access', 'Pop-ups and Redirects', 'Downloads'];
+    final privacy = ['Block third-party cookies', 'Block tracking scripts', 'Block fingerprinting attempts', 'Clear cookies on exit', 'Do Not Track request', 'Hide referrer where possible', 'Private DNS mode'];
+    final sessions = ['Separate cookies per space', 'Separate local storage per space', 'Separate cache per space', 'Prevent account merging', 'Clear Guest Space on exit'];
+    final behavior = ['Region Mode', 'Pinch Zoom Allowlist', 'Desktop Site Mode', 'JavaScript Control', 'Open links inside RN', 'Default search engine', 'Homepage', 'Location Shield', 'Network Persona'];
+
     return Scaffold(
       backgroundColor: RnColors.black,
       body: SafeArea(
-        child: ListView(padding: const EdgeInsets.fromLTRB(18, 18, 18, 112), children: [
-          const Text('Settings', style: TextStyle(fontSize: 34, fontWeight: FontWeight.w900)),
+        child: ListView(padding: const EdgeInsets.fromLTRB(18, 14, 18, 26), children: [
+          Row(children: [IconButton(onPressed: onBack, icon: const Icon(Icons.arrow_back_rounded)), const SizedBox(width: 8), const Text('Settings', style: TextStyle(fontSize: 36, fontWeight: FontWeight.w900))]),
           const SizedBox(height: 10),
-          Row(children: [ProfileChip(label: 'My Space', selected: profile == 'My Space', onTap: () => onProfileChanged('My Space')), const SizedBox(width: 8), ProfileChip(label: 'Guest Space', selected: profile == 'Guest Space', onTap: () => onProfileChanged('Guest Space'))]),
-          const SizedBox(height: 16),
-          ToggleCard(title: 'Access to mic', subtitle: 'Let selected websites request microphone access.', value: settings.mic, onChanged: (v) => onSettingsChanged(settings.copyWith(mic: v))),
-          ToggleCard(title: 'Access to camera', subtitle: 'Let selected websites request camera access.', value: settings.camera, onChanged: (v) => onSettingsChanged(settings.copyWith(camera: v))),
-          ToggleCard(title: 'Access gallery/files', subtitle: 'Allow Android gallery or file picker uploads.', value: settings.files, onChanged: (v) => onSettingsChanged(settings.copyWith(files: v))),
-          ToggleCard(title: 'Region mode', subtitle: 'Use browser region mode instead of real location by default.', value: settings.regionMode, onChanged: (v) => onSettingsChanged(settings.copyWith(regionMode: v))),
-          ToggleCard(title: 'Pinch zoom allowlist', subtitle: 'Pinch to zoom only on selected websites.', value: settings.pinchAllowList, onChanged: (v) => onSettingsChanged(settings.copyWith(pinchAllowList: v))),
-          ToggleCard(title: 'Desktop site', subtitle: 'Request desktop pages for the active space.', value: settings.desktopSite, onChanged: (v) => onSettingsChanged(settings.copyWith(desktopSite: v))),
-          ToggleCard(title: 'Dark page filter', subtitle: 'Slightly dim bright pages inside the browser.', value: settings.darkWebPages, onChanged: (v) => onSettingsChanged(settings.copyWith(darkWebPages: v))),
-          ToggleCard(title: 'Clear on profile switch', subtitle: 'Clear cookies and web storage when switching spaces.', value: settings.clearOnExit, onChanged: (v) => onSettingsChanged(settings.copyWith(clearOnExit: v))),
-          const SizedBox(height: 12),
+          Row(children: [ProfileChip(label: 'My Space', selected: profile == 'My Space', onTap: () => onProfileChanged('My Space')), const SizedBox(width: 10), ProfileChip(label: 'Guest Space', selected: profile == 'Guest Space', onTap: () => onProfileChanged('Guest Space'))]),
+          const SizedBox(height: 20),
+          SettingsList(title: 'Website Permissions', items: website),
+          SettingsList(title: 'Privacy Controls', items: privacy),
+          SettingsList(title: 'Session Isolation', items: sessions),
+          SettingsList(title: 'Browser Behavior', items: behavior),
           GlassPanel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Text('Region zoom', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-            Text('${settings.zoom.round()}%', style: const TextStyle(color: Colors.white70)),
+            Text('${settings.zoom.round()}%', style: const TextStyle(color: RnColors.muted)),
             Slider(min: 50, max: 150, value: settings.zoom, activeColor: RnColors.lemon, onChanged: (v) => onSettingsChanged(settings.copyWith(zoom: v))),
           ])),
+          const SizedBox(height: 16),
+          const AboutCard(),
+          const FooterLinks(),
         ]),
       ),
     );
   }
+}
+
+class SettingsList extends StatelessWidget {
+  const SettingsList({super.key, required this.title, required this.items});
+  final String title;
+  final List<String> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(padding: const EdgeInsets.only(bottom: 18), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(title, style: const TextStyle(color: RnColors.lemon, fontSize: 18, fontWeight: FontWeight.w900)),
+      const SizedBox(height: 10),
+      ...items.map((item) => Padding(padding: const EdgeInsets.only(bottom: 10), child: GlassPanel(padding: const EdgeInsets.all(16), child: Row(children: [Expanded(child: Text(item, style: const TextStyle(fontWeight: FontWeight.w800))), const Icon(Icons.chevron_right_rounded)])))),
+    ]));
+  }
+}
+
+class AboutCard extends StatelessWidget {
+  const AboutCard({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassPanel(child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('About RN', style: TextStyle(color: RnColors.lemon, fontSize: 19, fontWeight: FontWeight.w900)),
+      SizedBox(height: 10),
+      Text('RN Browser', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+      Text('Beta 0.6', style: TextStyle(color: RnColors.muted)),
+      SizedBox(height: 12),
+      Text('RN is a privacy-first browser by TEKDEV. It is designed to keep browsing sessions isolated, protect shared-phone users, and give people stronger control over cookies, permissions, and website access.', style: TextStyle(color: RnColors.muted, height: 1.4)),
+      SizedBox(height: 14),
+      Text('RN by TEKDEV', style: TextStyle(color: RnColors.lemon, fontWeight: FontWeight.w900)),
+    ]));
+  }
+}
+
+class FooterLinks extends StatelessWidget {
+  const FooterLinks({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(children: [
+      SizedBox(height: 12),
+      FooterLink(label: 'Privacy Policy'),
+      FooterLink(label: 'Terms'),
+      FooterLink(label: 'Contact TEKDEV'),
+      FooterLink(label: 'Check for updates'),
+      SizedBox(height: 8),
+      Text('RN by TEKDEV', style: TextStyle(color: RnColors.muted, fontWeight: FontWeight.w700)),
+    ]);
+  }
+}
+
+class FooterLink extends StatelessWidget {
+  const FooterLink({super.key, required this.label});
+  final String label;
+  @override
+  Widget build(BuildContext context) => Padding(padding: const EdgeInsets.only(bottom: 8), child: GlassPanel(padding: const EdgeInsets.all(16), child: Row(children: [Expanded(child: Text(label, style: const TextStyle(fontWeight: FontWeight.w800))), const Icon(Icons.chevron_right_rounded)])));
 }
 
 class ToggleCard extends StatelessWidget {
@@ -579,7 +559,7 @@ class ProfileChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(onTap: onTap, borderRadius: BorderRadius.circular(999), child: Container(padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9), decoration: BoxDecoration(color: selected ? RnColors.lemon : Colors.white10, borderRadius: BorderRadius.circular(999), border: Border.all(color: selected ? RnColors.lemon : Colors.white24)), child: Text(label, style: TextStyle(color: selected ? Colors.black : Colors.white, fontWeight: FontWeight.w900))));
+    return InkWell(onTap: onTap, borderRadius: BorderRadius.circular(999), child: Container(padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11), decoration: BoxDecoration(color: selected ? RnColors.lemon : Colors.white10, borderRadius: BorderRadius.circular(999), border: Border.all(color: selected ? RnColors.lemon : Colors.white24)), child: Text(label, style: TextStyle(color: selected ? Colors.black : Colors.white, fontWeight: FontWeight.w900))));
   }
 }
 
@@ -594,19 +574,20 @@ class BrowserControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassPanel(radius: 28, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10), child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
+    return GlassPanel(radius: 34, padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10), child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
       IconButton(onPressed: canBack ? onBack : null, icon: const Icon(Icons.arrow_back_rounded)),
       IconButton(onPressed: canForward ? onForward : null, icon: const Icon(Icons.arrow_forward_rounded)),
-      IconButton(onPressed: onHome, icon: const Icon(Icons.home_rounded, color: RnColors.lemon)),
+      IconButton(onPressed: onHome, icon: const Icon(Icons.public_rounded, color: RnColors.lemon, size: 30)),
       IconButton(onPressed: onRefresh, icon: const Icon(Icons.refresh_rounded)),
     ]));
   }
 }
 
 class SlideMenu extends StatelessWidget {
-  const SlideMenu({super.key, required this.onClose, required this.onNewTab});
+  const SlideMenu({super.key, required this.onClose, required this.onNewTab, required this.onSettings});
   final VoidCallback onClose;
   final VoidCallback onNewTab;
+  final VoidCallback onSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -626,10 +607,7 @@ class SlideMenu extends StatelessWidget {
               const MenuRow(icon: Icons.history_rounded, label: 'History'),
               const MenuRow(icon: Icons.download_rounded, label: 'Downloads'),
               const MenuRow(icon: Icons.favorite_border_rounded, label: 'Favorites'),
-              const Divider(color: Colors.white12),
-              const MenuRow(icon: Icons.visibility_off_rounded, label: 'Incognito Mode'),
-              const MenuRow(icon: Icons.desktop_windows_rounded, label: 'Desktop Site'),
-              const MenuRow(icon: Icons.tune_rounded, label: 'Customize'),
+              MenuRow(icon: Icons.tune_rounded, label: 'Settings', onTap: onSettings),
             ])),
           ),
         ),
@@ -650,30 +628,15 @@ class MenuRow extends StatelessWidget {
   }
 }
 
-class RnGlassNav extends StatelessWidget {
-  const RnGlassNav({super.key, required this.index, required this.onChanged});
-  final int index;
-  final ValueChanged<int> onChanged;
+class GlassPanel extends StatelessWidget {
+  const GlassPanel({super.key, required this.child, this.padding = const EdgeInsets.all(16), this.radius = 26});
+  final Widget child;
+  final EdgeInsets padding;
+  final double radius;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(padding: const EdgeInsets.fromLTRB(18, 0, 18, 20), child: GlassPanel(radius: 34, padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10), child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-      NavButton(icon: Icons.home_rounded, selected: index == 0, onTap: () => onChanged(0)),
-      NavButton(icon: Icons.public_rounded, selected: index == 1, onTap: () => onChanged(1)),
-      NavButton(icon: Icons.tune_rounded, selected: index == 2, onTap: () => onChanged(2)),
-    ])));
-  }
-}
-
-class NavButton extends StatelessWidget {
-  const NavButton({super.key, required this.icon, required this.selected, required this.onTap});
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(onTap: onTap, borderRadius: BorderRadius.circular(22), child: AnimatedContainer(duration: const Duration(milliseconds: 180), padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: selected ? RnColors.lemon.withOpacity(.18) : Colors.transparent, borderRadius: BorderRadius.circular(22), border: Border.all(color: selected ? RnColors.lemon : Colors.transparent)), child: Icon(icon, color: selected ? RnColors.lemon : Colors.white70, size: 28)));
+    return ClipRRect(borderRadius: BorderRadius.circular(radius), child: BackdropFilter(filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18), child: Container(padding: padding, decoration: BoxDecoration(color: RnColors.panel, borderRadius: BorderRadius.circular(radius), border: Border.all(color: RnColors.border, width: 1.2), boxShadow: const [BoxShadow(color: Color(0x331DFF75), blurRadius: 22, spreadRadius: 1)]), child: child)));
   }
 }
 
@@ -681,5 +644,16 @@ class FeaturePill extends StatelessWidget {
   const FeaturePill({super.key, required this.label});
   final String label;
   @override
-  Widget build(BuildContext context) => GlassPanel(radius: 999, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), child: Text(label, style: const TextStyle(fontWeight: FontWeight.w800)));
+  Widget build(BuildContext context) => GlassPanel(radius: 999, padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9), child: Text(label, style: const TextStyle(fontWeight: FontWeight.w900)));
+}
+
+class GlowBlob extends StatelessWidget {
+  const GlowBlob({super.key, required this.size, required this.color});
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(width: size, height: size, decoration: BoxDecoration(shape: BoxShape.circle, color: color.withOpacity(.13), boxShadow: [BoxShadow(color: color.withOpacity(.22), blurRadius: 80, spreadRadius: 16)]));
+  }
 }
